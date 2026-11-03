@@ -1,0 +1,754 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#171b18">
+  <title>STL Studio</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <script defer src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --page: #171b18;
+      --panel: #202521;
+      --panel-raised: #292f2a;
+      --line: #39413a;
+      --ink: #eff1e8;
+      --muted: #9da69a;
+      --lime: #d3f36b;
+      --red: #f08066;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 300px;
+      height: 100vh;
+      height: 100svh;
+      margin: 0;
+      overflow: hidden;
+      color: var(--ink);
+      background: var(--page);
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    }
+
+    button { font: inherit; }
+
+    .app {
+      display: grid;
+      width: 100%;
+      height: 100%;
+      grid-template-rows: 62px minmax(0, 1fr) 44px;
+    }
+
+    .toolbar {
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 22px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .identity, .actions, .action-group, .file-summary, .readout, .switch-label {
+      display: flex;
+      align-items: center;
+    }
+
+    .identity { min-width: 0; gap: 12px; }
+
+    .mark {
+      display: grid;
+      width: 30px;
+      height: 30px;
+      place-items: center;
+      border: 1px solid #647147;
+      border-radius: 4px;
+      color: var(--lime);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 19px;
+      line-height: 1;
+    }
+
+    .title-block { min-width: 0; }
+    h1 { margin: 0; font: 700 15px/1.1 Georgia, "Times New Roman", serif; }
+    .subtitle { margin-top: 4px; color: var(--muted); font: 10px/1 "Courier New", monospace; }
+    .actions { gap: 8px; }
+
+    .button {
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--ink);
+      background: var(--panel-raised);
+      font-size: 12px;
+      cursor: pointer;
+      transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+    }
+
+    .button:hover { border-color: #65705f; background: #333a34; }
+    .button:focus-visible, .switch:focus-visible + .switch-track { outline: 2px solid var(--lime); outline-offset: 2px; }
+    .button.primary { border-color: var(--lime); color: #20251b; background: var(--lime); font-weight: 700; }
+    .button.primary:hover { border-color: #e2ff8e; background: #e2ff8e; }
+    .button[disabled] { opacity: .45; cursor: default; }
+    .button .symbol { font-size: 16px; line-height: 12px; }
+
+    .switch-label { min-height: 34px; gap: 8px; padding: 0 8px; color: var(--muted); font-size: 12px; cursor: pointer; }
+    .switch { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+    .switch-track { position: relative; width: 31px; height: 18px; border: 1px solid #59625a; border-radius: 99px; background: #303731; transition: background-color 120ms ease; }
+    .switch-track::after { position: absolute; top: 3px; left: 3px; width: 10px; height: 10px; border-radius: 50%; background: #b1b8ac; content: ""; transition: transform 120ms ease, background-color 120ms ease; }
+    .switch:checked + .switch-track { border-color: var(--lime); background: #53652d; }
+    .switch:checked + .switch-track::after { transform: translateX(13px); background: var(--lime); }
+    .color-setting { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font: 10px/1 "Courier New", monospace; cursor: pointer; }
+    .color-swatch { width: 24px; height: 24px; padding: 2px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); cursor: pointer; }
+    .color-swatch:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+    .color-swatch::-webkit-color-swatch-wrapper { padding: 0; }
+    .color-swatch::-webkit-color-swatch, .color-swatch::-moz-color-swatch { border: 0; border-radius: 2px; }
+    .axis-control-group { display: inline-flex; align-items: center; gap: 5px; }
+    .axis-label { color: var(--muted); font: 9px/1 "Courier New", monospace; }
+    .axis-controls { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 4px; background: #191e1a; }
+    .button.axis-button { width: 27px; min-height: 27px; padding: 0; border-color: transparent; background: transparent; font: 600 11px/1 "Courier New", monospace; }
+    .button.axis-button:hover:not(:disabled) { background: #333a34; }
+    .button.axis-button[aria-pressed="true"] { color: #20251b; background: var(--lime); }
+    .button.axis-button:disabled { opacity: .4; }
+    .button.place-active { border-color: var(--lime); color: var(--lime); }
+
+    .stage {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+      background-color: #191e1a;
+      background-image: radial-gradient(#303831 0.7px, transparent 0.7px);
+      background-size: 20px 20px;
+    }
+
+    .stage canvas { display: block; width: 100%; height: 100%; }
+    .stage.placing-face canvas { cursor: crosshair; }
+    .stage.dragging::after { position: absolute; z-index: 3; inset: 14px; border: 2px dashed var(--lime); border-radius: 7px; background: #171b18aa; content: "Release to open STL"; display: grid; place-items: center; color: var(--lime); font: 16px "Courier New", monospace; pointer-events: none; }
+
+    .empty-state {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      z-index: 1;
+      width: min(360px, calc(100% - 36px));
+      display: grid;
+      justify-items: center;
+      padding: 30px 22px;
+      border: 1px dashed #596257;
+      border-radius: 6px;
+      background: #202521e8;
+      text-align: center;
+      transform: translate(-50%, -50%);
+    }
+
+    .empty-state[hidden] { display: none; }
+    .empty-mark { width: 38px; height: 38px; display: grid; place-items: center; margin-bottom: 15px; border: 1px solid #647147; border-radius: 50%; color: var(--lime); font: 23px/1 Georgia, serif; }
+    .empty-state h2 { margin: 0; font: 20px/1.2 Georgia, "Times New Roman", serif; }
+    .empty-state p { max-width: 240px; margin: 9px 0 18px; color: var(--muted); font: 12px/1.5 "Courier New", monospace; }
+
+    .file-input { display: none; }
+
+    .hud {
+      position: absolute;
+      top: 14px;
+      right: 16px;
+      left: 16px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      pointer-events: none;
+    }
+
+    .file-summary, .readout {
+      min-height: 34px;
+      gap: 10px;
+      padding: 0 11px;
+      border: 1px solid #424a42;
+      border-radius: 4px;
+      background: #202521e8;
+      font: 11px/1 "Courier New", monospace;
+    }
+
+    .file-summary[hidden] { display: none; }
+    .file-name { max-width: min(36vw, 300px); overflow: hidden; color: var(--ink); text-overflow: ellipsis; white-space: nowrap; }
+    .readout { gap: 14px; color: var(--muted); }
+    .readout span { white-space: nowrap; }
+    .readout b { color: var(--ink); font-weight: 400; }
+
+    .notice {
+      position: absolute;
+      right: 16px;
+      bottom: 16px;
+      max-width: min(360px, calc(100% - 32px));
+      padding: 10px 13px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--ink);
+      background: #202521f2;
+      font: 11px/1.45 "Courier New", monospace;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(4px);
+      transition: opacity 140ms ease, transform 140ms ease;
+    }
+
+    .notice.visible { opacity: 1; transform: translateY(0); }
+    .notice.error { border-color: #9d5847; color: #ffc2ad; }
+    .placement-hint { position: absolute; bottom: 16px; left: 50%; max-width: calc(100% - 24px); padding: 9px 12px; border: 1px solid #647147; border-radius: 4px; color: var(--lime); background: #202521f2; font: 10px/1 "Courier New", monospace; pointer-events: none; transform: translateX(-50%); white-space: nowrap; }
+    .placement-hint[hidden] { display: none; }
+
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 20px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      background: var(--panel);
+      font: 10px/1 "Courier New", monospace;
+    }
+
+    .footer span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .key { padding: 2px 5px; border: 1px solid #4a524a; border-radius: 3px; color: #c4cabb; }
+
+    @media (max-width: 600px) {
+      .app { grid-template-rows: auto minmax(0, 1fr) 38px; }
+      .toolbar { min-height: 62px; flex-wrap: wrap; gap: 8px; padding: 9px 12px; }
+      .identity { gap: 8px; }
+      .mark { width: 27px; height: 27px; }
+      .subtitle { font-size: 9px; }
+      .actions { width: 100%; min-width: 0; flex: 1 1 100%; flex-wrap: wrap; justify-content: space-between; gap: 5px; }
+      .button { min-height: 32px; padding: 0 8px; font-size: 11px; }
+      .button .symbol { display: none; }
+      .switch-label { min-height: 32px; gap: 6px; padding: 0 2px; font-size: 11px; }
+      .color-setting { gap: 3px; font-size: 9px; }
+      .color-swatch { width: 21px; height: 21px; }
+      .stage { min-height: 0; }
+      .hud { top: 10px; right: 10px; left: 10px; flex-direction: column; gap: 6px; }
+      .file-summary, .readout { min-height: 29px; gap: 8px; padding: 0 8px; font-size: 10px; }
+      .file-name { max-width: 48vw; }
+      .readout { max-width: 100%; flex-wrap: wrap; row-gap: 6px; padding: 7px 8px; }
+      .footer { padding: 0 12px; font-size: 9px; }
+      .footer > span:last-child { display: none; }
+      .empty-state { padding: 25px 16px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="toolbar">
+      <div class="identity">
+        <div class="mark" aria-hidden="true">◈</div>
+        <div class="title-block">
+          <h1>STL Studio</h1>
+          <div class="subtitle">MESH VIEWER <span aria-hidden="true">/</span> 01</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <label class="switch-label" title="Toggle wireframe rendering">
+          <input class="switch" id="wire-toggle" type="checkbox">
+          <span class="switch-track" aria-hidden="true"></span>
+          Wireframe
+        </label>
+        <label class="color-setting" title="Change object color">
+          Object
+          <input class="color-swatch" id="object-color" type="color" value="#91a17c" aria-label="Object color">
+        </label>
+        <label class="color-setting" title="Change base and grid color">
+          Base
+          <input class="color-swatch" id="base-color" type="color" value="#191e1a" aria-label="Base color">
+        </label>
+        <label class="color-setting" title="Change base frame color">
+          Frame
+          <input class="color-swatch" id="frame-color" type="color" value="#57634d" aria-label="Frame color">
+        </label>
+        <label class="switch-label" title="Show or hide the base frame">
+          <input class="switch" id="grid-toggle" type="checkbox" aria-label="Base frame" checked>
+          <span class="switch-track" aria-hidden="true"></span>
+          Base frame
+        </label>
+        <div class="axis-control-group">
+          <span class="axis-label">AXIS</span>
+          <div class="axis-controls" role="group" aria-label="View along axis">
+            <button class="button axis-button" type="button" data-axis="x" aria-label="View along X axis" title="View along X axis" aria-pressed="false" disabled>X</button>
+            <button class="button axis-button" type="button" data-axis="y" aria-label="View along Y axis" title="View along Y axis" aria-pressed="false" disabled>Y</button>
+            <button class="button axis-button" type="button" data-axis="z" aria-label="View along Z axis" title="View along Z axis" aria-pressed="false" disabled>Z</button>
+          </div>
+        </div>
+        <button class="button" id="reset-view" type="button" title="Reset camera view" disabled><span class="symbol" aria-hidden="true">↺</span>Reset view</button>
+        <button class="button" id="place-face" type="button" aria-pressed="false" title="Select a triangular face to place it on the base" disabled>Place face</button>
+        <button class="button primary" id="open-file" type="button"><span class="symbol" aria-hidden="true">＋</span>Open STL</button>
+      </div>
+    </header>
+
+    <section class="stage" id="stage" aria-label="3D model viewport">
+      <input class="file-input" id="file-input" type="file" accept=".stl,model/stl,application/sla">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-mark" aria-hidden="true">◈</div>
+        <h2>Open a mesh</h2>
+        <p>Choose an STL file or drop one anywhere in this view.</p>
+        <button class="button primary" id="empty-open" type="button">Choose STL file</button>
+      </div>
+      <div class="hud">
+        <div class="file-summary" id="file-summary" hidden>
+          <span aria-hidden="true" style="color:var(--lime)">◈</span>
+          <span class="file-name" id="file-name"></span>
+        </div>
+        <div class="readout" id="readout" hidden>
+          <span>SIZE <b id="dimensions">—</b></span>
+          <span>TRIANGLES <b id="triangles">—</b></span>
+          <span>FILE <b id="file-size">—</b></span>
+        </div>
+      </div>
+      <div class="notice" id="notice" role="status" aria-live="polite"></div>
+      <div class="placement-hint" id="placement-hint" role="status" aria-live="polite" hidden>CLICK A FACE TO PLACE IT · ESC TO CANCEL</div>
+    </section>
+
+    <footer class="footer">
+      <span>DRAG TO ORBIT <span class="key">SCROLL</span> ZOOM <span class="key">RIGHT DRAG</span> PAN</span>
+      <span id="footer-status">READY · STL</span>
+    </footer>
+  </main>
+
+  <script>
+    (() => {
+      const stage = document.querySelector("#stage");
+      const fileInput = document.querySelector("#file-input");
+      const emptyState = document.querySelector("#empty-state");
+      const fileSummary = document.querySelector("#file-summary");
+      const readout = document.querySelector("#readout");
+      const notice = document.querySelector("#notice");
+      const resetButton = document.querySelector("#reset-view");
+      const placeFaceButton = document.querySelector("#place-face");
+      const placementHint = document.querySelector("#placement-hint");
+      const wireToggle = document.querySelector("#wire-toggle");
+      const objectColorInput = document.querySelector("#object-color");
+      const baseColorInput = document.querySelector("#base-color");
+      const frameColorInput = document.querySelector("#frame-color");
+      const gridToggle = document.querySelector("#grid-toggle");
+      const axisButtons = [...document.querySelectorAll(".axis-button")];
+      const footerStatus = document.querySelector("#footer-status");
+      let renderer;
+      let camera;
+      let controls;
+      let currentMesh;
+      let grid;
+      let noticeTimer;
+      let initialCamera;
+
+      function showNotice(message, isError = false) {
+        notice.textContent = message;
+        notice.classList.toggle("error", isError);
+        notice.classList.add("visible");
+        clearTimeout(noticeTimer);
+        noticeTimer = setTimeout(() => notice.classList.remove("visible"), 4200);
+      }
+
+      function formatSize(bytes) {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      }
+
+      function formatExtent(value) {
+        return Number(value.toPrecision(4)).toString();
+      }
+
+      function init() {
+        if (!window.THREE || !THREE.STLLoader || !THREE.OrbitControls) {
+          footerStatus.textContent = "LIBRARY LOAD FAILED";
+          showNotice("3D libraries could not load. Check your internet connection and reload this page.", true);
+          return;
+        }
+
+        try {
+          renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+          renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+          renderer.setSize(stage.clientWidth, stage.clientHeight);
+          renderer.outputEncoding = THREE.sRGBEncoding;
+          renderer.setClearColor(0x191e1a, 1);
+          stage.prepend(renderer.domElement);
+
+          const scene = new THREE.Scene();
+          scene.background = new THREE.Color(0x191e1a);
+          scene.fog = new THREE.Fog(0x191e1a, 10, 28);
+
+          camera = new THREE.PerspectiveCamera(38, stage.clientWidth / stage.clientHeight, 0.01, 1000);
+          camera.position.set(2.7, 2.1, 3.2);
+          controls = new THREE.OrbitControls(camera, renderer.domElement);
+          controls.enableDamping = true;
+          controls.dampingFactor = 0.075;
+          controls.target.set(0, 0, 0);
+          initialCamera = { position: camera.position.clone(), target: controls.target.clone(), up: camera.up.clone() };
+          const faceRaycaster = new THREE.Raycaster();
+          const facePointer = new THREE.Vector2();
+          const previewMaterial = new THREE.MeshBasicMaterial({
+            color: 0xd3f36b,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -2
+          });
+          let facePreview;
+          let placingFace = false;
+
+          function setControlsUp(up) {
+            if (camera.up.equals(up)) return;
+            const target = controls.target.clone();
+            controls.dispose();
+            camera.up.copy(up);
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.075;
+            controls.target.copy(target);
+            controls.update();
+          }
+
+          function viewOnAxis(axis) {
+            if (!currentMesh) return;
+            const target = controls.target.clone();
+            const distance = camera.position.distanceTo(target);
+            setControlsUp(axis === "y" ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0));
+            const direction = {
+              x: new THREE.Vector3(1, 0, 0),
+              y: new THREE.Vector3(0, 1, 0),
+              z: new THREE.Vector3(0, 0, 1)
+            }[axis];
+            if (!direction) return;
+            camera.position.copy(target).add(direction.multiplyScalar(distance));
+            controls.update();
+            axisButtons.forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.axis === axis)));
+          }
+
+          function clearFacePreview() {
+            if (!facePreview) return;
+            scene.remove(facePreview);
+            facePreview.geometry.dispose();
+            facePreview = undefined;
+          }
+
+          function setPlacementMode(active) {
+            placingFace = active && Boolean(currentMesh);
+            controls.enabled = !placingFace;
+            placeFaceButton.setAttribute("aria-pressed", String(placingFace));
+            placeFaceButton.classList.toggle("place-active", placingFace);
+            placementHint.hidden = !placingFace;
+            stage.classList.toggle("placing-face", placingFace);
+            resetButton.disabled = placingFace || !currentMesh;
+            axisButtons.forEach((button) => { button.disabled = placingFace || !currentMesh; });
+            if (!placingFace) {
+              clearFacePreview();
+              if (currentMesh) footerStatus.textContent = "MODEL LOADED · STL";
+            } else {
+              footerStatus.textContent = "SELECT A FACE · ESC TO CANCEL";
+            }
+          }
+
+          function intersectModel(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            facePointer.set(
+              ((event.clientX - rect.left) / rect.width) * 2 - 1,
+              -((event.clientY - rect.top) / rect.height) * 2 + 1
+            );
+            faceRaycaster.setFromCamera(facePointer, camera);
+            return faceRaycaster.intersectObject(currentMesh, false)[0];
+          }
+
+          function previewFace(hit) {
+            if (!hit?.face || (facePreview?.userData.faceIndex === hit.faceIndex && facePreview.userData.meshId === hit.object.id)) return;
+            clearFacePreview();
+            const attribute = hit.object.geometry.attributes.position;
+            const normal = hit.face.normal.clone().applyMatrix3(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld)).normalize();
+            const vertices = [hit.face.a, hit.face.b, hit.face.c].map((index) => {
+              const point = new THREE.Vector3().fromBufferAttribute(attribute, index);
+              hit.object.localToWorld(point);
+              point.addScaledVector(normal, 0.001);
+              return point;
+            });
+            const geometry = new THREE.BufferGeometry();
+            geometry.setFromPoints(vertices);
+            geometry.setIndex([0, 1, 2]);
+            geometry.computeVertexNormals();
+            facePreview = new THREE.Mesh(geometry, previewMaterial);
+            facePreview.userData.faceIndex = hit.faceIndex;
+            facePreview.userData.meshId = hit.object.id;
+            scene.add(facePreview);
+          }
+
+          function placeFaceOnBase(hit) {
+            const normal = hit.face.normal.clone().applyMatrix3(new THREE.Matrix3().getNormalMatrix(currentMesh.matrixWorld)).normalize();
+            const center = currentMesh.userData.vertexCenter.clone();
+            currentMesh.localToWorld(center);
+            const centerSide = center.sub(hit.point).dot(normal);
+            const localPoint = currentMesh.worldToLocal(hit.point.clone());
+            const localNormal = hit.face.normal.clone();
+            if (centerSide > 0) {
+              normal.negate();
+              localNormal.negate();
+            }
+            const positions = currentMesh.geometry.attributes.position;
+            let maxSupportDistance = -Infinity;
+            for (let index = 0; index < positions.count; index++) {
+              const distance = (positions.getX(index) - localPoint.x) * localNormal.x
+                + (positions.getY(index) - localPoint.y) * localNormal.y
+                + (positions.getZ(index) - localPoint.z) * localNormal.z;
+              maxSupportDistance = Math.max(maxSupportDistance, distance);
+            }
+            const rotation = new THREE.Quaternion().setFromUnitVectors(normal, new THREE.Vector3(0, -1, 0));
+            currentMesh.quaternion.premultiply(rotation);
+            currentMesh.updateMatrixWorld(true);
+            const point = currentMesh.localToWorld(localPoint);
+            const offset = grid.position.y - point.y;
+            currentMesh.position.y += offset;
+            controls.target.y += offset;
+            camera.position.y += offset;
+            initialCamera.position.y += offset;
+            initialCamera.target.y += offset;
+            currentMesh.updateMatrixWorld(true);
+            controls.update();
+            setPlacementMode(false);
+            if (maxSupportDistance > 0.0001) {
+              showNotice("Face aligned to the base; other geometry extends below it.", true);
+            } else {
+              showNotice("Face placed on the base.");
+            }
+          }
+
+          scene.add(new THREE.HemisphereLight(0xe4edd7, 0x333c35, 0.2));
+          const keyLight = new THREE.DirectionalLight(0xfff0d8, 0.3);
+          keyLight.position.set(4, 7, 5);
+          scene.add(keyLight);
+          const fillLight = new THREE.DirectionalLight(0x9ed3bd, 0.1);
+          fillLight.position.set(-5, 2, -4);
+          scene.add(fillLight);
+
+          grid = new THREE.GridHelper(2.4, 24, 0x57634d, 0x343d35);
+          grid.position.y = -0.505;
+          scene.add(grid);
+
+          function updateBaseColor(value) {
+            const color = new THREE.Color(value);
+            scene.background.copy(color);
+            scene.fog.color.copy(color);
+            renderer.setClearColor(color, 1);
+          }
+
+          function updateFrameColor(value) {
+            const color = new THREE.Color(value);
+            const lightness = color.getHSL({}).l;
+            const nextGrid = new THREE.GridHelper(
+              2.4,
+              24,
+              color,
+              color.clone().offsetHSL(0, 0, lightness < 0.48 ? -0.1 : -0.18)
+            );
+            nextGrid.position.y = grid.position.y;
+            nextGrid.visible = gridToggle.checked;
+            scene.remove(grid);
+            grid.geometry.dispose();
+            (Array.isArray(grid.material) ? grid.material : [grid.material]).forEach((material) => material.dispose());
+            grid = nextGrid;
+            scene.add(grid);
+          }
+
+          updateBaseColor(baseColorInput.value);
+          updateFrameColor(frameColorInput.value);
+
+          function resizeViewport() {
+            if (!renderer || !stage.clientWidth || !stage.clientHeight) return;
+            const nextAspect = stage.clientWidth / stage.clientHeight;
+            const currentFitScale = Math.max(1, 0.85 / camera.aspect);
+            const nextFitScale = Math.max(1, 0.85 / nextAspect);
+            if (currentMesh && currentFitScale !== nextFitScale) {
+              const scale = nextFitScale / currentFitScale;
+              camera.position.sub(controls.target).multiplyScalar(scale).add(controls.target);
+              initialCamera.position.sub(initialCamera.target).multiplyScalar(scale).add(initialCamera.target);
+            }
+            camera.aspect = nextAspect;
+            camera.updateProjectionMatrix();
+            renderer.setSize(stage.clientWidth, stage.clientHeight);
+          }
+
+          const resize = new ResizeObserver(resizeViewport);
+          resize.observe(stage);
+
+          document.querySelector("#open-file").addEventListener("click", () => fileInput.click());
+          document.querySelector("#empty-open").addEventListener("click", () => fileInput.click());
+          document.querySelector("#reset-view").addEventListener("click", resetView);
+          placeFaceButton.addEventListener("click", () => setPlacementMode(!placingFace));
+          axisButtons.forEach((button) => button.addEventListener("click", () => viewOnAxis(button.dataset.axis)));
+          fileInput.addEventListener("change", () => {
+            if (fileInput.files[0]) loadFile(fileInput.files[0]);
+            fileInput.value = "";
+          });
+          wireToggle.addEventListener("change", () => {
+            if (currentMesh) currentMesh.material.wireframe = wireToggle.checked;
+          });
+          objectColorInput.addEventListener("input", () => {
+            if (currentMesh) currentMesh.material.color.set(objectColorInput.value);
+          });
+          baseColorInput.addEventListener("input", () => updateBaseColor(baseColorInput.value));
+          frameColorInput.addEventListener("input", () => updateFrameColor(frameColorInput.value));
+          gridToggle.addEventListener("change", () => { grid.visible = gridToggle.checked; });
+          stage.addEventListener("pointermove", (event) => {
+            if (placingFace) previewFace(intersectModel(event));
+          });
+          stage.addEventListener("pointerleave", clearFacePreview);
+          stage.addEventListener("click", (event) => {
+            if (!placingFace) return;
+            const hit = intersectModel(event);
+            if (!hit?.face) {
+              showNotice("Select a visible face on the model.", true);
+              return;
+            }
+            placeFaceOnBase(hit);
+          });
+          document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && placingFace) {
+              setPlacementMode(false);
+              event.preventDefault();
+            }
+          });
+
+          stage.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            stage.classList.add("dragging");
+          });
+          stage.addEventListener("dragleave", (event) => {
+            if (!stage.contains(event.relatedTarget)) stage.classList.remove("dragging");
+          });
+          stage.addEventListener("drop", (event) => {
+            event.preventDefault();
+            stage.classList.remove("dragging");
+            const file = [...event.dataTransfer.files].find((item) => item.name.toLowerCase().endsWith(".stl"));
+            if (file) loadFile(file);
+            else showNotice("Choose a file with the .stl extension.", true);
+          });
+
+          function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+          }
+          animate();
+          function resetView() {
+            if (!currentMesh) return;
+            setControlsUp(initialCamera.up);
+            camera.position.copy(initialCamera.position);
+            controls.target.copy(initialCamera.target);
+            controls.update();
+            axisButtons.forEach((button) => button.setAttribute("aria-pressed", "false"));
+          }
+
+          async function loadFile(file) {
+            setPlacementMode(false);
+              setControlsUp(new THREE.Vector3(0, 1, 0));
+            if (!file.name.toLowerCase().endsWith(".stl")) {
+              showNotice("Choose a file with the .stl extension.", true);
+              return;
+            }
+            footerStatus.textContent = "READING FILE...";
+            try {
+              const geometry = new THREE.STLLoader().parse(await file.arrayBuffer());
+              geometry.computeVertexNormals();
+              geometry.computeBoundingBox();
+              const bounds = geometry.boundingBox;
+              const dimensions = new THREE.Vector3();
+              bounds.getSize(dimensions);
+              const maxDimension = Math.max(dimensions.x, dimensions.y, dimensions.z);
+              if (!Number.isFinite(maxDimension) || maxDimension <= 0 || geometry.attributes.position.count < 3) {
+                geometry.dispose();
+                throw new Error("The file does not contain a renderable 3D surface.");
+              }
+
+              geometry.center();
+              geometry.computeBoundingBox();
+              if (currentMesh) {
+                scene.remove(currentMesh);
+                currentMesh.geometry.dispose();
+                currentMesh.material.dispose();
+              }
+              const material = new THREE.MeshStandardMaterial({
+                color: objectColorInput.value,
+                side: THREE.DoubleSide,
+                metalness: 0.18,
+                roughness: 0.48,
+                flatShading: true,
+                wireframe: wireToggle.checked
+              });
+              currentMesh = new THREE.Mesh(geometry, material);
+              currentMesh.scale.setScalar(1.5 / maxDimension);
+              const positions = geometry.attributes.position;
+              const vertexCenter = new THREE.Vector3();
+              for (let index = 0; index < positions.count; index++) {
+                vertexCenter.x += positions.getX(index);
+                vertexCenter.y += positions.getY(index);
+                vertexCenter.z += positions.getZ(index);
+              }
+              currentMesh.userData.vertexCenter = vertexCenter.multiplyScalar(1 / positions.count);
+              scene.add(currentMesh);
+              currentMesh.updateMatrixWorld(true);
+              const modelBounds = new THREE.Box3().setFromObject(currentMesh);
+              currentMesh.position.y += grid.position.y + 0.006 - modelBounds.min.y;
+              currentMesh.updateMatrixWorld(true);
+
+              const target = new THREE.Vector3(0, currentMesh.position.y, 0);
+              const fit = new THREE.Vector3(3.1, 2.7, -2.0)
+                .multiplyScalar(Math.max(1, 0.85 / camera.aspect))
+                .add(target);
+              camera.position.copy(fit);
+              controls.target.copy(target);
+              controls.update();
+              initialCamera = { position: fit.clone(), target: target.clone(), up: camera.up.clone() };
+              resetButton.disabled = false;
+              placeFaceButton.disabled = false;
+              axisButtons.forEach((button) => { button.disabled = false; });
+              axisButtons.forEach((button) => button.setAttribute("aria-pressed", "false"));
+              emptyState.hidden = true;
+              fileSummary.hidden = false;
+              readout.hidden = false;
+              document.querySelector("#file-name").textContent = file.name;
+              document.querySelector("#dimensions").textContent = `${formatExtent(dimensions.x)} × ${formatExtent(dimensions.y)} × ${formatExtent(dimensions.z)}`;
+              document.querySelector("#triangles").textContent = (geometry.attributes.position.count / 3).toLocaleString();
+              document.querySelector("#file-size").textContent = formatSize(file.size);
+              footerStatus.textContent = "MODEL LOADED · STL";
+            } catch (error) {
+              footerStatus.textContent = currentMesh ? "MODEL LOADED · STL" : "READY · STL";
+              showNotice(error instanceof Error ? error.message : "Could not read this STL file.", true);
+            }
+          }
+
+        } catch (error) {
+          footerStatus.textContent = "WEBGL UNAVAILABLE";
+          showNotice("This browser could not create a 3D view. Try a browser with WebGL enabled.", true);
+        }
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init, { once: true });
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>
